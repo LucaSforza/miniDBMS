@@ -155,6 +155,17 @@ public:
         return rel.get()->isValid(data);
     }
 
+    vector<Value> getKey() {
+
+        auto result = vector<Value>();
+
+        for(Field key : rel.get()->getKey()) {
+            result.push_back(tuple(key,valueAt(key))); //TODO: fare in modo che l'interno del for sia O(1)
+        }
+
+        return result;
+    }
+
 private:
     shared_ptr<Relation> rel;
     string data;
@@ -162,13 +173,13 @@ private:
 
 
 class Table {
-//TODO: aggiungere concetto di chiave
 public:
     Table(shared_ptr<Relation> rel): rel(rel) {}
 
     void addRecord(Record record) {
-        if(!record.isValid())
-            throw invalid_argument("Record non valido");
+        if(!search(record.getKey()).empty()) {
+            throw invalid_argument("Vincolo di chiave infranto");
+        }
         volatileRecords.push_back(record);
     }
 
