@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <stdexcept>
 #include <unordered_set>
+#include <tuple>
 
 #include "Domains.cpp"
 
@@ -34,6 +35,8 @@ private:
     shared_ptr<Domain> domain;
     bool isKeyField;
 };
+
+using Value = tuple<Field,string_view>;
 
 class Relation {
 public:
@@ -105,6 +108,10 @@ public:
         return true;
     }
 
+    const vector<Field>& getKey() {
+        return keyFields;
+    }
+
     bool operator==(const Relation& other) const {
         return fields == other.fields && keyFields == other.keyFields;
     }
@@ -123,7 +130,7 @@ private:
 */
 class Record {
 public:
-    //TODO:
+
     Record(shared_ptr<Relation> rel, string data): rel(rel), data(data) {
         if(!rel.get()->isValid(data)) {
             throw invalid_argument("I dati non sono validi");
@@ -135,6 +142,15 @@ public:
         return string_view(data.c_str() + rel.get()->startPointOf(field), field.size());
     }
 
+    bool valuesInside(const vector<Value>& values) {
+        for(auto [field,data] : values) {
+            if(valueAt(field) != data)
+                return false;
+        }
+
+        return true;
+    }
+
     bool isValid() {
         return rel.get()->isValid(data);
     }
@@ -143,6 +159,7 @@ private:
     shared_ptr<Relation> rel;
     string data;
 };
+
 
 class Table {
 //TODO: aggiungere concetto di chiave
@@ -153,6 +170,17 @@ public:
         if(!record.isValid())
             throw invalid_argument("Record non valido");
         volatileRecords.push_back(record);
+    }
+
+    vector<Record&> search(const vector<Value>& values) {
+        auto result = vector<Record&>();
+
+        for(Record& r : volatileRecords) {
+            if(r.valuesInside(values))
+                result.push_back(r);
+        }
+
+        return result;
     }
 
 private:
