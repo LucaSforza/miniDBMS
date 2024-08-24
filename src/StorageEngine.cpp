@@ -26,7 +26,7 @@ public:
 
     bool isKey() { return isKeyField; }
 
-    uint size() {
+    size_t size() {
         return domain.get()->size();
     }
 

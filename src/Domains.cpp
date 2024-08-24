@@ -6,7 +6,7 @@ class Domain {
 public:
     virtual ~Domain() = default;
     virtual bool isValid(const std::string_view value) const = 0;
-    virtual uint size() const = 0;
+    virtual size_t size() const = 0;
 };
 
 class EnumDomain : public Domain {
@@ -23,13 +23,13 @@ public:
         return std::find(validValues.begin(), validValues.end(), value) != validValues.end();
     }
 
-    uint size() const override {
+    size_t size() const override {
         return max_len;
     }
 
 private:
     std::vector<std::string> validValues;
-    uint max_len;
+    size_t max_len;
 };
 
 class IntegerDomain : public Domain {
@@ -39,7 +39,7 @@ public:
         return value.length() == sizeof(int); // deve essere lungo 4 byte per essere un numero valido
     }
 
-    uint size() const override {
+    size_t size() const override {
         return sizeof(int);
     }
 
@@ -54,12 +54,12 @@ public:
         return value.length() <= max_len;
     };
 
-    uint size() const override {
+    size_t size() const override {
         return max_len;
     }
 
 private:
-    uint max_len;
+    size_t max_len;
 };
 
 //TODO: aggiungere domini
