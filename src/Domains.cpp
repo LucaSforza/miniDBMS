@@ -32,6 +32,8 @@ private:
     size_t max_len;
 };
 
+using SharedDomain = std::shared_ptr<Domain>;
+
 class IntegerDomain : public Domain {
 public:
 

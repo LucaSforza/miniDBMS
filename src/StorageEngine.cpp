@@ -32,7 +32,7 @@ public:
 
 private:
     string name;
-    shared_ptr<Domain> domain;
+    SharedDomain domain;
     bool isKeyField;
 };
 
@@ -44,7 +44,7 @@ public:
         this->fields    = vector<Field>();
         this->keyFields = vector<Field>();
 
-        auto names = unordered_set<string>();
+        auto names = unordered_set<string_view>();
     
         for(Field f: fields) {
             if(f.isKey())
@@ -174,7 +174,7 @@ private:
 
 class Table {
 public:
-    Table(shared_ptr<Relation> rel): rel(rel) {}
+    Table(shared_ptr<Relation> rel, string name): rel(rel), name(name) {}
 
     void addRecord(Record record) {
         if(!search(record.getKey()).empty()) {
@@ -194,8 +194,56 @@ public:
         return result;
     }
 
+    const string& getName() {
+        return name;
+    }
+
 private:
+    string name;
     shared_ptr<Relation> rel;
     // records salvati nella RAM e non sul disco rigito
     vector<Record> volatileRecords;
+};
+
+class Database {
+public:
+    Database() {}
+
+    Database(vector<SharedDomain> domains): domains(domains) {}
+
+    void addDomain(SharedDomain domain) {
+        //TODO: controllare che il dominio sia unico all'interno del database
+        domains.push_back(domain);
+    }
+
+    void addTable(Table table) {
+        //TODO: prima di aggiungere la tabella al database bisogna controllare che
+        // nella sua relazione esistono tutti e soli domini presenti nel database
+        // controllare anche che il nome sia unico nel database
+        tables.push_back(table);
+    }
+
+    optional<Table&> getTable(string_view name) {
+        for (Table& table : tables) {
+            if (table.getName() == name) {
+                return table;
+            }
+        }
+        return nullopt;
+    }
+
+    // ritorna True se esisteva una tabella con quel nome, False se la tabella non esisteva
+    bool deleteTable(string_view name) {
+        for (auto it = tables.begin(); it != tables.end(); ++it) {
+            if (it->getName() == name) {
+                tables.erase(it);
+                return true;
+            }
+        }
+        return false;
+    }
+
+private:
+    vector<SharedDomain> domains;
+    vector<Table> tables;
 };
