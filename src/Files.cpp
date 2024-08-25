@@ -3,6 +3,7 @@
 #include <fstream>
 #include <fcntl.h>
 #include <unistd.h>
+#include <optional>
 
 using namespace std;
 
@@ -23,7 +24,10 @@ public:
     void flush() { file.flush(); }
 
     // ritorna Record uno dopo l'altro senza un ordine
-    virtual istream_iterator<string> getRecords() const = 0;
+    virtual iterator<input_iterator_tag,string> begin() = 0;
+
+    // ritorna ultimo iteratore possibile
+    virtual iterator<input_iterator_tag,string> end() = 0;
 
     // inserisce dati nel database
     virtual void pushData(string_view data) = 0;
@@ -58,11 +62,41 @@ public:
         truncateFile();
     }
 
+    class RecordIterator : public iterator<input_iterator_tag, string> {
+        fstream& fileStream;
+        size_t recordSize;
+        size_t pos;
+    public:
+        RecordIterator(fstream& file, size_t recordSize, size_t pos = 0)
+            : fileStream(file), recordSize(recordSize), pos(pos) {}
 
-    istream_iterator<string> getRecords() const override {
-        auto buffer = make_shared<RecordStreamBuffer>(file, recordSize);
-        std::istream recordStream(buffer.get());
-        return istream_iterator<string>(recordStream);
+        iterator& operator++() {
+            pos += recordSize;
+            return *this;
+        }
+
+        string operator*() const {
+            string record(recordSize, '\0');
+            fileStream.seekg(pos, ios::beg);
+            fileStream.read(record.data(), recordSize);
+            return record;
+        }
+
+        bool operator==(const RecordIterator& other) const {
+            return pos == other.pos;
+        }
+
+        bool operator!=(const RecordIterator& other) const {
+            return pos != other.pos;
+        }
+    };
+
+    iterator<input_iterator_tag,string> begin() override {
+        return RecordIterator(file, recordSize);
+    }
+
+    iterator<input_iterator_tag,string> end() override {
+        return RecordIterator(file, recordSize, endFilePosition);
     }
 
     void pushData(string_view data) override {
@@ -157,29 +191,5 @@ private:
 
         close(fd);
     }
-
-    class RecordStreamBuffer : public std::streambuf {
-        fstream fileStream;
-        size_t recordSize;
-        string buffer;
-
-    public:
-        RecordStreamBuffer(fstream& file, size_t recordSize)
-            : fileStream(std::move(file)), recordSize(recordSize) {
-            buffer.resize(recordSize);
-            this->setg(buffer.data(), buffer.data(), buffer.data());
-        }
-
-    protected:
-        virtual int underflow() override {
-            if (fileStream.eof()) return EOF;
-
-            fileStream.read(buffer.data(), recordSize);
-            if (fileStream.gcount() == 0) return EOF;
-
-            this->setg(buffer.data(), buffer.data(), buffer.data() + fileStream.gcount());
-            return static_cast<unsigned char>(buffer[0]);
-        }
-    };
 
 };
