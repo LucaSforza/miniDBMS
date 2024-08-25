@@ -200,7 +200,7 @@ public:
 
         for(const Record& r : volatileRecords) {
             if(r.valuesInside(values))
-                result.push_back(cref(r));
+                result.push_back(r);
         }
 
         return result;
