@@ -7,6 +7,7 @@
 #include <tuple>
 
 #include "Domains.cpp"
+#include "Files.cpp"
 
 using namespace std;
 
@@ -51,17 +52,24 @@ public:
         this->keyFields = vector<Field>();
 
         auto names = unordered_set<string_view>();
+
+        recordTotalSize = 0;
+        keySize = 0;
     
         for(Field f: fields) {
-            if(f.isKey())
+            if(f.isKey()) {
                 keyFields.push_back(f);
-            else fields.push_back(f);
+                keySize += f.size();
+            } else fields.push_back(f);
 
             if(names.find(f.getName()) == names.end()) {
                 names.insert(f.getName());
             } else {
                 throw invalid_argument("Non possono esistere due campi con lo stesso nome");
             }
+
+            recordTotalSize += f.size();
+
         }
 
         if(this->keyFields.empty())
@@ -122,6 +130,10 @@ public:
         return fields == other.fields && keyFields == other.keyFields;
     }
 
+    size_t getRecordSize() { return recordTotalSize; }
+
+    size_t getKeySize() { return keySize; }
+
     /* vector<Field>::iterator getFields() const {
         //TODO: implementare
     } */
@@ -129,6 +141,8 @@ public:
 private:
     vector<Field> fields;
     vector<Field> keyFields;
+    size_t recordTotalSize;
+    size_t keySize;
 };
 
 /*
@@ -177,6 +191,10 @@ public:
         return result;
     }
 
+    string_view getKeyData() const {
+        return string_view(data.c_str(), rel.get()->getKeySize());
+    }
+
 private:
     shared_ptr<Relation> rel;
     string data;
@@ -186,7 +204,7 @@ using ConstRecordRef = reference_wrapper<const Record>;
 
 class Table {
 public:
-    Table(shared_ptr<Relation> rel, string name): rel(rel), name(name) {}
+    Table(shared_ptr<Relation> rel, string name, FileRef file): rel(rel), name(name),file(file) {}
 
     void addRecord(Record record) {
         if(!search(record.getKey()).empty()) {
@@ -212,20 +230,23 @@ public:
 
     shared_ptr<Relation> getRelation() { return rel; }
 
+    void flush() { volatileRecords.clear(); }
+
 private:
     string name;
     shared_ptr<Relation> rel;
     // records salvati nella RAM e non sul disco rigito
     vector<Record> volatileRecords;
+    FileRef file;
 };
 
 using TableRef = reference_wrapper<Table>;
 
 class Database {
 public:
-    Database() {}
+    Database(string name): name(name) {}
 
-    Database(vector<SharedDomain> domains): domains(domains) {}
+    Database(string name, vector<SharedDomain> domains): name(name),domains(domains) {}
 
     void addDomain(SharedDomain domain) {
         //TODO: controllare che il dominio sia unico all'interno del database
@@ -266,6 +287,7 @@ public:
     }
 
 private:
+    string name;
     vector<SharedDomain> domains;
     vector<Table> tables;
 };
