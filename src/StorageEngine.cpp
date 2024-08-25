@@ -20,9 +20,9 @@ public:
 
     const string& getName() const { return name; }
 
-    SharedDomain getDomain() { return domain; }
+    SharedDomain getDomain() const { return domain; }
 
-    bool isKey() { return isKeyField; }
+    bool isKey() const { return isKeyField; }
 
     bool isValid(const string_view value) const {
         return domain->isValid(value);
@@ -69,7 +69,7 @@ public:
         Restituisce il numero di byte laddove inizia in un Record di questa relazione
         un certo Field.
      */
-    size_t startPointOf(const Field& field) {
+    size_t startPointOf(const Field& field) const {
         size_t result = 0;
 
         for(auto f : keyFields) {
@@ -89,7 +89,7 @@ public:
         return result;
     }
 
-    bool isValid(const string& data) {
+    bool isValid(const string& data) const {
 
         size_t i = 0;
         bool result = true;
@@ -111,7 +111,7 @@ public:
         return true;
     }
 
-    const vector<Field>& getKey() {
+    const vector<Field>& getKey() const {
         return keyFields;
     }
 
@@ -119,7 +119,7 @@ public:
         return fields == other.fields && keyFields == other.keyFields;
     }
 
-    vector<Field>::iterator getFields() {
+    vector<Field>::iterator getFields() const {
         //TODO: implementare
     }
 
@@ -146,11 +146,11 @@ public:
     }
 
     // Ritorna una vista sulla parte di record di cui fa parte il campo
-    const string_view valueAt(const Field& field) {
+    const string_view valueAt(const Field& field) const {
         return string_view(data.c_str() + rel.get()->startPointOf(field), field.size());
     }
 
-    bool valuesInside(const vector<Value>& values) {
+    bool valuesInside(const vector<Value>& values) const {
         for(auto [field,data] : values) {
             if(valueAt(field) != data)
                 return false;
@@ -159,15 +159,15 @@ public:
         return true;
     }
 
-    bool isValid() {
+    bool isValid() const {
         return rel.get()->isValid(data);
     }
 
-    vector<Value> getKey() {
+    vector<Value> getKey() const {
 
         auto result = vector<Value>();
 
-        for(const Field& key : rel.get()->getKey()) {
+        for(auto key : rel.get()->getKey()) {
             result.push_back(tuple(key,valueAt(key))); //TODO: fare in modo che l'interno del for sia O(1)
         }
 
@@ -191,10 +191,10 @@ public:
         volatileRecords.push_back(record);
     }
 
-    vector<Record&> search(const vector<Value>& values) {
+    vector<Record&> search(const vector<Value>& values) const {
         auto result = vector<Record&>();
 
-        for(Record& r : volatileRecords) {
+        for(auto r : volatileRecords) {
             if(r.valuesInside(values))
                 result.push_back(r);
         }
@@ -202,7 +202,7 @@ public:
         return result;
     }
 
-    const string& getName() {
+    const string& getName() const {
         return name;
     }
 
