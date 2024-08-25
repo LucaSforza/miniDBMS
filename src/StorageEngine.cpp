@@ -20,13 +20,15 @@ public:
 
     const string& getName() const { return name; }
 
+    SharedDomain getDomain() { return domain; }
+
+    bool isKey() { return isKeyField; }
+
     bool isValid(const string_view value) const {
         return domain->isValid(value);
     }
 
-    bool isKey() { return isKeyField; }
-
-    size_t size() {
+    size_t size() const {
         return domain.get()->size();
     }
 
@@ -36,7 +38,8 @@ private:
     bool isKeyField;
 };
 
-using Value = tuple<Field,string_view>;
+//TODO: Field deve essere un puntatore
+using Value = tuple<const Field&,string_view>;
 
 class Relation {
 public:
@@ -66,7 +69,7 @@ public:
         Restituisce il numero di byte laddove inizia in un Record di questa relazione
         un certo Field.
      */
-    size_t startPointOf(Field& field) {
+    size_t startPointOf(const Field& field) {
         size_t result = 0;
 
         for(auto f : keyFields) {
@@ -115,6 +118,11 @@ public:
     bool operator==(const Relation& other) const {
         return fields == other.fields && keyFields == other.keyFields;
     }
+
+    vector<Field>::iterator getFields() {
+        //TODO: implementare
+    }
+
 private:
     vector<Field> fields;
     vector<Field> keyFields;
@@ -138,7 +146,7 @@ public:
     }
 
     // Ritorna una vista sulla parte di record di cui fa parte il campo
-    const string_view valueAt(Field& field) {
+    const string_view valueAt(const Field& field) {
         return string_view(data.c_str() + rel.get()->startPointOf(field), field.size());
     }
 
@@ -159,7 +167,7 @@ public:
 
         auto result = vector<Value>();
 
-        for(Field key : rel.get()->getKey()) {
+        for(const Field& key : rel.get()->getKey()) {
             result.push_back(tuple(key,valueAt(key))); //TODO: fare in modo che l'interno del for sia O(1)
         }
 
@@ -198,6 +206,8 @@ public:
         return name;
     }
 
+    shared_ptr<Relation> getRelation() { return rel; }
+
 private:
     string name;
     shared_ptr<Relation> rel;
@@ -217,9 +227,15 @@ public:
     }
 
     void addTable(Table table) {
-        //TODO: prima di aggiungere la tabella al database bisogna controllare che
-        // nella sua relazione esistono tutti e soli domini presenti nel database
-        // controllare anche che il nome sia unico nel database
+        // TODO: Check if all domains in the table's relation exist in the database
+
+        // Check if the table name is unique in the database
+        for (Table& existingTable : tables) {
+            if (existingTable.getName() == table.getName()) {
+                throw invalid_argument("Table name already exists in the database");
+            }
+        }
+
         tables.push_back(table);
     }
 
