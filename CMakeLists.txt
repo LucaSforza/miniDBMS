@@ -14,14 +14,14 @@ add_executable(MiniDBMS src/main.cpp)
 include_directories(src)
 
 # Aggiungi i file sorgente al progetto
-# add_library(StorageEngine src/StorageEngine.cpp src/StorageEngine.h)
+add_library(StorageEngine src/StorageEngine.cpp)
 # add_library(BTree src/BTree.cpp src/BTree.h)
 # add_library(SQLParser src/SQLParser.cpp src/SQLParser.h)
 # add_library(QueryExecutor src/QueryExecutor.cpp src/QueryExecutor.h)
 # add_library(TransactionManager src/TransactionManager.cpp src/TransactionManager.h)
 
 # Collega le librerie all'eseguibile
-# target_link_libraries(MiniDBMS StorageEngine)
+target_link_libraries(MiniDBMS StorageEngine)
 # target_link_libraries(MiniDBMS BTree)
 # target_link_libraries(MiniDBMS SQLParser)
 # target_link_libraries(MiniDBMS QueryExecutor)

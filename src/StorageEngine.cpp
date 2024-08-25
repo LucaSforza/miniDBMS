@@ -32,6 +32,10 @@ public:
         return domain.get()->size();
     }
 
+    bool operator==(const Field& other) const {
+        return *domain.get() == *other.domain.get() && name == name;
+    }
+
 private:
     string name;
     SharedDomain domain;
@@ -118,9 +122,9 @@ public:
         return fields == other.fields && keyFields == other.keyFields;
     }
 
-    vector<Field>::iterator getFields() const {
+    /* vector<Field>::iterator getFields() const {
         //TODO: implementare
-    }
+    } */
 
 private:
     vector<Field> fields;
@@ -178,6 +182,7 @@ private:
     string data;
 };
 
+using ConstRecordRef = reference_wrapper<const Record>;
 
 class Table {
 public:
@@ -190,12 +195,12 @@ public:
         volatileRecords.push_back(record);
     }
 
-    vector<Record&> search(const vector<Value>& values) const {
-        auto result = vector<Record&>();
+    vector<ConstRecordRef> search(const vector<Value>& values) const {
+        auto result = vector<ConstRecordRef>();
 
-        for(auto r : volatileRecords) {
+        for(const Record& r : volatileRecords) {
             if(r.valuesInside(values))
-                result.push_back(r);
+                result.push_back(cref(r));
         }
 
         return result;
@@ -213,6 +218,8 @@ private:
     // records salvati nella RAM e non sul disco rigito
     vector<Record> volatileRecords;
 };
+
+using TableRef = reference_wrapper<Table>;
 
 class Database {
 public:
@@ -238,7 +245,7 @@ public:
         tables.push_back(table);
     }
 
-    optional<Table&> getTable(string_view name) {
+    optional<TableRef> getTable(string_view name) {
         for (Table& table : tables) {
             if (table.getName() == name) {
                 return table;
