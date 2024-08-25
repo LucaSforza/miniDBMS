@@ -38,7 +38,6 @@ private:
     bool isKeyField;
 };
 
-//TODO: Field deve essere un puntatore
 using Value = tuple<const Field&,string_view>;
 
 class Relation {
