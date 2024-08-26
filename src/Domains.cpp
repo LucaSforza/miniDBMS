@@ -66,7 +66,7 @@ public:
 class StringDomain : public Domain {
 public:
 
-    StringDomain(uint max_len) : max_len(max_len) {}
+    StringDomain(size_t max_len) : max_len(max_len) {}
 
     bool isValid(const std::string_view value) const override {
         return value.length() <= max_len;

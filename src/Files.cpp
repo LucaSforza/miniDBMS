@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <optional>
+#include <iostream>
 
 using namespace std;
 
@@ -15,13 +16,22 @@ public:
     File(string fileName): name(fileName) {
         file.open(fileName, ios::binary | ios::in | ios::out);
 
-        if (!file.is_open())
-            throw runtime_error("Failed to open file: " + fileName);
+        if (!file.is_open()) {
+            file.open(fileName, ios::binary | ios::in | ios::out | ios::trunc);
+            if(!file.is_open())
+                throw runtime_error("Failed to open file: " + fileName);
+        }
     }
 
     const string& filename() { return name; }
 
-    void flush() { file.flush(); }
+    void flush() {
+        file.flush();
+    }
+
+    void sync() {
+        file.sync();
+    }
 
     // ritorna Record uno dopo l'altro senza un ordine
     virtual iterator<input_iterator_tag,string> begin() = 0;
@@ -41,7 +51,7 @@ public:
     virtual ~File() = default;
 };
 
-using FileRef = reference_wrapper<File>;
+using SharedFile = shared_ptr<File>;
 
 class HeapFile: public File {
 
@@ -57,7 +67,6 @@ public:
     }
 
     ~HeapFile() override {
-        file.seekg(0, ios::beg);
         file.close();
         truncateFile();
     }
@@ -104,9 +113,11 @@ public:
         if(data.length() % recordSize != 0 || data.length() == 0)
             throw runtime_error("Data length is not a multiple of record size");
 
-        file.seekp(endFilePosition, ios::beg);
-        file.write(data.data(), data.length());
+        file.seekg(endFilePosition, ios::beg);
+        if(!file.write(data.data(), data.length()))
+            throw runtime_error("Failed to write data");
         endFilePosition += data.length();
+
 
     }
 
@@ -121,18 +132,25 @@ public:
         file.seekp(pos, ios::beg);
         file.write(getLastRecord().c_str(), recordSize);
         removeLastRecord();
+
     }
 
     optional<string> getData(string_view key) {
         string result(recordSize, '\0');
 
-        long pos = searchPosition(key);
+        file.seekg(0, ios::beg);
+        size_t n = 0;
 
-        if(pos == -1) return nullopt;
+        do {
+            n = file.read(result.data(), recordSize).gcount();
+            if(n < recordSize) {
+                file.clear();
+                return nullopt;
+            }
+            if(string_view(result.c_str(),keySize) == key)
+                return result;
+        }while(true);
 
-        file.seekg(pos, ios::beg);
-        if (file.read((char*)result.data(), recordSize).gcount() == 0)
-            return nullopt;
 
         return result;
     }
@@ -142,7 +160,11 @@ private:
     // ritorna -1 se non è stato trovato, un numero positivo altrimenti
     long searchPosition(string_view key) {
         //TODO: gestire il caso in cui la lunghezza della key è sbagliata
-        file.seekp(0, ios::beg);
+
+        if(!file)
+            throw runtime_error("Not working");
+
+        file.seekg(0, ios::beg);
         string data(recordSize, '\0');
         size_t n = 0;
 
@@ -151,11 +173,14 @@ private:
         do {
             result += n;
             n = file.read(data.data(), recordSize).gcount();
-            if(n < recordSize)
+            if(n < recordSize) {
+                file.clear();
                 return -1;
+            }
             if(string_view(data.c_str(),keySize) == key)
                 return result;
         }while(true);
+
         
     }
 
@@ -168,6 +193,7 @@ private:
         // Read the last record from the file
         string lastRecord(recordSize, '\0');
         file.read(lastRecord.data(), recordSize);
+
 
         return lastRecord;
     }

@@ -5,13 +5,21 @@
 #include <stdexcept>
 #include <unordered_set>
 #include <tuple>
+#include <memory>
+#include <filesystem>
 
 #include "Domains.cpp"
 #include "Files.cpp"
 
 using namespace std;
 
+namespace fs = std::filesystem;
+
+
 class Field {
+    string name;
+    SharedDomain domain;
+    bool isKeyField;
 public:
     Field(const string& name, shared_ptr<Domain> domain,bool isKeyField)
         : name(name), domain(domain), isKeyField(isKeyField) {}
@@ -36,16 +44,15 @@ public:
     bool operator==(const Field& other) const {
         return *domain.get() == *other.domain.get() && name == name;
     }
-
-private:
-    string name;
-    SharedDomain domain;
-    bool isKeyField;
 };
 
 using Value = tuple<const Field&,string_view>;
 
 class Relation {
+    vector<Field> fields;
+    vector<Field> keyFields;
+    size_t recordTotalSize;
+    size_t keySize;
 public:
     Relation(vector<Field> fields) {
         this->fields    = vector<Field>();
@@ -138,11 +145,6 @@ public:
         //TODO: implementare
     } */
 
-private:
-    vector<Field> fields;
-    vector<Field> keyFields;
-    size_t recordTotalSize;
-    size_t keySize;
 };
 
 /*
@@ -154,13 +156,18 @@ private:
     Tutti i campi sono attaccati.
 */
 class Record {
+    shared_ptr<Relation> rel;
+    string data;
 public:
 
     Record(shared_ptr<Relation> rel, string data): rel(rel), data(data) {
+
         if(!rel.get()->isValid(data)) {
             throw invalid_argument("I dati non sono validi");
         }
     }
+
+    const string& getData() { return data; }
 
     // Ritorna una vista sulla parte di record di cui fa parte il campo
     const string_view valueAt(const Field& field) const {
@@ -194,23 +201,28 @@ public:
     string_view getKeyData() const {
         return string_view(data.c_str(), rel.get()->getKeySize());
     }
-
-private:
-    shared_ptr<Relation> rel;
-    string data;
 };
 
 using ConstRecordRef = reference_wrapper<const Record>;
 
 class Table {
+    string name;
+    shared_ptr<Relation> rel;
+    // records salvati nella RAM e non sul disco rigito
+    vector<Record> volatileRecords;
+    SharedFile file;
 public:
-    Table(shared_ptr<Relation> rel, string name, FileRef file): rel(rel), name(name),file(file) {}
+    Table(shared_ptr<Relation> rel, string name, SharedFile file): rel(rel), name(name),file(file) {}
 
     void addRecord(Record record) {
         if(!search(record.getKey()).empty()) {
             throw invalid_argument("Vincolo di chiave infranto");
         }
-        volatileRecords.push_back(record);
+        auto f = file.get();
+        if(f->getData(record.getKeyData())) //TODO: inserire questo nella search
+            throw runtime_error("Record già esistente"); //TODO: dopo aver eseguito getData poi il file è rotto
+        f->pushData(record.getData());
+        f->flush();
     }
 
     vector<ConstRecordRef> search(const vector<Value>& values) const {
@@ -231,39 +243,47 @@ public:
     shared_ptr<Relation> getRelation() { return rel; }
 
     void flush() { volatileRecords.clear(); }
-
-private:
-    string name;
-    shared_ptr<Relation> rel;
-    // records salvati nella RAM e non sul disco rigito
-    vector<Record> volatileRecords;
-    FileRef file;
 };
 
 using TableRef = reference_wrapper<Table>;
 
 class Database {
+    string name;
+    string dirPath;
+    vector<SharedDomain> domains;
+    vector<Table> tables;
 public:
-    Database(string name): name(name) {}
+    Database(string name,string dirPath): name(name), dirPath(dirPath) {
+        domains.push_back(make_shared<IntegerDomain>());
+        domains.push_back(make_shared<StringDomain>(25));
 
-    Database(string name, vector<SharedDomain> domains): name(name),domains(domains) {}
+        if (!fs::exists(dirPath)) {
+            fs::create_directory(dirPath);
+        }
+    }
 
     void addDomain(SharedDomain domain) {
         //TODO: controllare che il dominio sia unico all'interno del database
         domains.push_back(domain);
     }
 
-    void addTable(Table table) {
+    void addTable(string name, shared_ptr<Relation> relation) {
         // TODO: Check if all domains in the table's relation exist in the database
 
         // Check if the table name is unique in the database
         for (Table& existingTable : tables) {
-            if (existingTable.getName() == table.getName()) {
+            if (existingTable.getName() == name) {
                 throw invalid_argument("Table name already exists in the database");
             }
         }
 
-        tables.push_back(table);
+        //TODO: permettere di far scegliere il tipo di file da utilizzare, per ora tutte le tabelle saranno HeapFile
+        // in futuro l'utente potrà scegliere tra: HeapFile, HashFile, BTreeFile, IndexFile
+        auto file = make_shared<HeapFile>(
+            dirPath + name,relation.get()->getKeySize(),relation.get()->getRecordSize()
+        );
+
+        tables.push_back(Table(relation,name,file));
     }
 
     optional<TableRef> getTable(string_view name) {
@@ -285,9 +305,4 @@ public:
         }
         return false;
     }
-
-private:
-    string name;
-    vector<SharedDomain> domains;
-    vector<Table> tables;
 };
