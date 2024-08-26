@@ -220,7 +220,7 @@ public:
         }
         auto f = file.get();
         if(f->getData(record.getKeyData())) //TODO: inserire questo nella search
-            throw runtime_error("Record già esistente"); //TODO: dopo aver eseguito getData poi il file è rotto
+            throw runtime_error("Record già esistente");
         f->pushData(record.getData());
         f->flush();
     }
