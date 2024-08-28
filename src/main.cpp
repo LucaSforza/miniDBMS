@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "StorageEngine.cpp"
+#include "StorageEngine.hpp"
 
 int main(void) {
 
