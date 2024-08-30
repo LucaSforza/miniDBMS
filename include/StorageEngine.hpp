@@ -106,13 +106,21 @@ public:
 using ConstRecordRef = reference_wrapper<const Record>;
 
 class Table {
+
+};
+
+class QueryResult: public Table {
+
+};
+
+class FisicalTable: public Table {
     string name;
     shared_ptr<Relation> rel;
     // records salvati nella RAM e non sul disco rigito
     vector<Record> volatileRecords;
     SharedFile file;
 public:
-    Table(shared_ptr<Relation> rel, string name, SharedFile file);
+    FisicalTable(shared_ptr<Relation> rel, string name, SharedFile file);
 
     void addRecord(Record record);
 
@@ -125,13 +133,13 @@ public:
     void flush();
 };
 
-using TableRef = reference_wrapper<Table>;
+using FisicalTableRef = reference_wrapper<FisicalTable>;
 
 class Database {
     string name;
     string dirPath;
     vector<SharedDomain> domains;
-    vector<Table> tables;
+    vector<FisicalTable> tables;
 public:
     Database(string name,string dirPath);
 
@@ -139,7 +147,7 @@ public:
 
     void addTable(string name, shared_ptr<Relation> relation);
 
-    optional<TableRef> getTable(string_view name);
+    optional<FisicalTableRef> getTable(string_view name);
 
     // ritorna True se esisteva una tabella con quel nome, False se la tabella non esisteva
     bool deleteTable(string_view name);

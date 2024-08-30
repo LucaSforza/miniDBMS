@@ -29,8 +29,20 @@ add_executable(MiniDBMS src/main.cpp)
 
 # Aggiungi i file sorgente al progetto
 add_library(StorageEngine src/StorageEngine.cpp src/Files.cpp src/Domains.cpp)
+add_library(SQLInterpreter src/SQLInterface.cpp src/SQLInterpreter.cpp)
+
+find_package(Curses REQUIRED)
+include_directories(${CURSES_INCLUDE_DIRS})
+
+# Copia la libreria nella cartella build
+add_custom_command(TARGET MiniDBMS POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${SQL_PARSER_DIR}/libsqlparser.so $<TARGET_FILE_DIR:MiniDBMS>
+)
 
 # Collega le librerie all'eseguibile
 add_dependencies(MiniDBMS sqlparser)
 target_link_libraries(MiniDBMS StorageEngine)
 target_link_libraries(MiniDBMS ${SQL_PARSER_DIR}/libsqlparser.so)
+target_link_libraries(MiniDBMS SQLInterpreter)
+target_link_libraries(MiniDBMS ${CURSES_LIBRARIES})
