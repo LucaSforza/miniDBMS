@@ -85,15 +85,15 @@ void HeapFile::pushData(string_view data) {
     endFilePosition += data.length();
 }
 
-void HeapFile::deleteData(string_view key) {
+optional<string> HeapFile::deleteData(string_view key) {
     if(endFilePosition == 0) return;
 
         long pos = searchPosition(key);
 
         if(pos == -1) return;
 
-        file.seekp(pos, ios::beg);
-        file.write(getLastRecord().c_str(), recordSize);
+        file.seekp(pos, ios::beg); //TODO: gestire il caso in cui il file è vuoto
+        file.write(getLastRecord().value().c_str(), recordSize);
         removeLastRecord();
 }
 
@@ -142,8 +142,8 @@ long HeapFile::searchPosition(string_view key) {
         
 }
 
-string HeapFile::getLastRecord() {
-        // gestire il caso in cui non ci sia un record alla fine poiché il file è vuoto
+optional<string> HeapFile::getLastRecord() {
+    // TODO: gestire il caso in cui non ci sia un record alla fine poiché il file è vuoto
     size_t position = endFilePosition - recordSize;
 
         // Move the file pointer to the position of the last record

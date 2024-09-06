@@ -14,6 +14,7 @@
 #include "Domains.hpp"
 #include "File.hpp"
 #include "HeapFile.hpp"
+#include "Tables.hpp"
 
 using namespace std;
 
@@ -64,9 +65,9 @@ public:
 
     bool operator==(const Relation& other) const;
 
-    size_t getRecordSize();
+    size_t getRecordSize() const;
 
-    size_t getKeySize();
+    size_t getKeySize() const;
 
     /* vector<Field>::iterator getFields() const {
         //TODO: implementare
@@ -101,53 +102,27 @@ public:
     vector<Value> getKey() const;
 
     string_view getKeyData() const;
+
+    void setValue(const Value& val);
+
 };
 
 using ConstRecordRef = reference_wrapper<const Record>;
-
-class Table {
-
-};
-
-class QueryResult: public Table {
-
-};
-
-class FisicalTable: public Table {
-    string name;
-    shared_ptr<Relation> rel;
-    // records salvati nella RAM e non sul disco rigito
-    vector<Record> volatileRecords;
-    SharedFile file;
-public:
-    FisicalTable(shared_ptr<Relation> rel, string name, SharedFile file);
-
-    void addRecord(Record record);
-
-    vector<ConstRecordRef> search(const vector<Value>& values) const;
-
-    const string& getName() const;
-
-    shared_ptr<Relation> getRelation();
-
-    void flush();
-};
-
-using FisicalTableRef = reference_wrapper<FisicalTable>;
 
 class Database {
     string name;
     string dirPath;
     vector<SharedDomain> domains;
-    vector<FisicalTable> tables;
+    vector<PhysicalTable> tables;
 public:
     Database(string name,string dirPath);
 
     void addDomain(SharedDomain domain);
 
+    template<typename F,typename = enable_if_t<is_base_of<File, F>::value>>
     void addTable(string name, shared_ptr<Relation> relation);
 
-    optional<FisicalTableRef> getTable(string_view name);
+    optional<PhysicalTableRef> getTable(string_view name);
 
     // ritorna True se esisteva una tabella con quel nome, False se la tabella non esisteva
     bool deleteTable(string_view name);

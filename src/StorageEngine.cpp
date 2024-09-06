@@ -1,4 +1,6 @@
 #include "StorageEngine.hpp"
+#include "Tables.hpp"
+#include "File.hpp"
 
 Field::Field(const string& name, shared_ptr<Domain> domain,bool isKeyField)
 : name(name), domain(domain), isKeyField(isKeyField) {}
@@ -104,9 +106,9 @@ bool Relation::operator==(const Relation& other) const {
     return fields == other.fields && keyFields == other.keyFields;
 }
 
-size_t Relation::getRecordSize() { return recordTotalSize; }
+size_t Relation::getRecordSize() const { return recordTotalSize; }
 
-size_t Relation::getKeySize() { return keySize; }
+size_t Relation::getKeySize() const { return keySize; }
 
 
 Record::Record(shared_ptr<Relation> rel, string data): rel(rel), data(data) {
@@ -150,37 +152,10 @@ string_view Record::getKeyData() const {
     return string_view(data.c_str(), rel.get()->getKeySize());
 }
 
-Table::Table(shared_ptr<Relation> rel, string name, SharedFile file): rel(rel), name(name),file(file) {}
-
-void Table::addRecord(Record record) {
-    if(!search(record.getKey()).empty()) {
-        throw invalid_argument("Vincolo di chiave infranto");
-    }
-    auto f = file.get();
-    if(f->getData(record.getKeyData())) //TODO: inserire questo nella search
-        throw runtime_error("Record già esistente");
-    f->pushData(record.getData());
-    f->flush();
+void Record::setValue(const Value& val) {
+    auto [field,newData] = val;
+    memcpy(data.data() + rel.get()->startPointOf(field),newData.data(), field.size());
 }
-
-vector<ConstRecordRef> Table::search(const vector<Value>& values) const {
-    auto result = vector<ConstRecordRef>();
-
-    for(const Record& r : volatileRecords) {
-        if(r.valuesInside(values))
-            result.push_back(r);
-    }
-
-    return result;
-}
-
-const string& Table::getName() const {
-    return name;
-}
-
-shared_ptr<Relation> Table::getRelation() { return rel; }
-
-void Table::flush() { volatileRecords.clear(); }
 
 Database::Database(string name,string dirPath): name(name), dirPath(dirPath) {
     domains.push_back(make_shared<IntegerDomain>());
@@ -191,46 +166,3 @@ Database::Database(string name,string dirPath): name(name), dirPath(dirPath) {
     }
 }
 
-void Database::addDomain(SharedDomain domain) {
-    //TODO: controllare che il dominio sia unico all'interno del database
-    domains.push_back(domain);
-}
-
-void Database::addTable(string name, shared_ptr<Relation> relation) {
-    // TODO: Check if all domains in the table's relation exist in the database
-
-    // Check if the table name is unique in the database
-    for (Table& existingTable : tables) {
-        if (existingTable.getName() == name) {
-            throw invalid_argument("Table name already exists in the database");
-        }
-    }
-
-    //TODO: permettere di far scegliere il tipo di file da utilizzare, per ora tutte le tabelle saranno HeapFile
-    // in futuro l'utente potrà scegliere tra: HeapFile, HashFile, BTreeFile, IndexFile
-    auto file = make_shared<HeapFile>(
-        dirPath + name,relation.get()->getKeySize(),relation.get()->getRecordSize()
-    );
-
-    tables.push_back(Table(relation,name,file));
-}
-
-optional<TableRef> Database::getTable(string_view name) {
-    for (Table& table : tables) {
-        if (table.getName() == name) {
-            return table;
-        }
-    }
-    return nullopt;
-}
-
-// ritorna True se esisteva una tabella con quel nome, False se la tabella non esisteva
-bool Database::deleteTable(string_view name) {
-    for (auto it = tables.begin(); it != tables.end(); ++it) {
-        if (it->getName() == name) {
-            tables.erase(it);
-            return true;
-        }
-    }
-    return false;
-}
