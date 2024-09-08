@@ -86,15 +86,21 @@ void HeapFile::pushData(string_view data) {
 }
 
 optional<string> HeapFile::deleteData(string_view key) {
-    if(endFilePosition == 0) return;
+    
+    auto last_record = getLastRecord();
+    
+    if(last_record.has_value()) {
 
         long pos = searchPosition(key);
+        if(pos == -1) return nullptr;
 
-        if(pos == -1) return;
-
-        file.seekp(pos, ios::beg); //TODO: gestire il caso in cui il file è vuoto
-        file.write(getLastRecord().value().c_str(), recordSize);
+        file.seekp(pos, ios::beg);
+        file.write(last_record.value().c_str(), recordSize);
         removeLastRecord();
+        return last_record.value();
+    }
+
+    return nullptr;
 }
 
 optional<string> HeapFile::getData(string_view key) {

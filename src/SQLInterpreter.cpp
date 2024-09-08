@@ -1,8 +1,6 @@
 #include <iostream>
 
 #include "SQLInterpreter.hpp"
-#include "SQLParser.h"
-#include "SQLParserResult.h"
 #include "sql/SQLStatement.h"
 #include "sql/Table.h"
 
@@ -21,7 +19,7 @@ void SQLInterpreter::execute(const string& sql) {
         for(auto statement : result.getStatements()) {
             executeStatement(statement);
         }        
-    } else cout << "SQL_ERROR: " << result.errorMsg() << endl;
+    } else cout << "SQL_PARSER_ERROR: " << result.errorMsg() << endl;
 
 }
 
@@ -49,7 +47,7 @@ void SQLInterpreter::executeSelect(hsql::SelectStatement *select) {
         break;
     
     default:
-        cout << "SQL: unsupported query";
+        cout << "SQL: unsupported query" << endl;
     }
 
 }

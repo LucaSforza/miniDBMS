@@ -14,7 +14,6 @@
 #include "Domains.hpp"
 #include "File.hpp"
 #include "HeapFile.hpp"
-#include "Tables.hpp"
 
 using namespace std;
 
@@ -109,6 +108,8 @@ public:
 
 using ConstRecordRef = reference_wrapper<const Record>;
 
+#include "Tables.hpp"
+
 class Database {
     string name;
     string dirPath;
@@ -119,7 +120,6 @@ public:
 
     void addDomain(SharedDomain domain);
 
-    template<typename F,typename = enable_if_t<is_base_of<File, F>::value>>
     void addTable(string name, shared_ptr<Relation> relation);
 
     optional<PhysicalTableRef> getTable(string_view name);

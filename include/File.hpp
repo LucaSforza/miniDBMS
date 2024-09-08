@@ -66,6 +66,6 @@ public:
 
 };
 
-using SharedFile = shared_ptr<File>;
+using FilePtr = unique_ptr<File>;
 
 #endif // FILE_HPP

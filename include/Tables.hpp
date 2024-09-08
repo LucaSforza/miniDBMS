@@ -106,9 +106,9 @@ class PhysicalTable: public Table {
     string name;
     // records salvati nella RAM e non sul disco rigito
     vector<Record> volatileRecords;
-    SharedFile file;
+    FilePtr file;
 public:
-    PhysicalTable(shared_ptr<Relation> rel, string name, SharedFile file);
+    PhysicalTable(shared_ptr<Relation> rel, string name, FilePtr file);
 
     void addRecord(Record record) override;
 

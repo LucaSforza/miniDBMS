@@ -59,8 +59,8 @@ bool VirtualTable::updateRecordByKey(string_view key, const vector<Value>& newVa
 
 // PhysicalTable
 
-PhysicalTable::PhysicalTable(shared_ptr<Relation> rel, string name, SharedFile file)
-: Table(rel), name(name), file(file) {}
+PhysicalTable::PhysicalTable(shared_ptr<Relation> rel, string name, FilePtr file)
+: Table(rel), name(name), file(move(file)) {}
 
 void PhysicalTable::addRecord(Record record) {
     auto f = file.get();
