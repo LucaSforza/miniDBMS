@@ -1,5 +1,7 @@
 #include <iostream>
+#include <string>
 
+#include "linenoise.h"
 #include "SQLInterface.hpp"
 #include "SQLInterpreter.hpp"
 
@@ -8,13 +10,17 @@ SQLInterface::SQLInterface() : interpreter(SQLInterpreter()) {}
 void SQLInterface::run() {
     printWelcomeMessage();
 
-    std::string input;
-    while (true) {
-        std::cout << "sql> ";
-        std::getline(std::cin, input);
+    char *line;
+    while ((line = linenoise("sql> ")) != nullptr) {
+        std::string input(line);
+        linenoiseFree(line);
 
         if (input == "exit" || input == "quit") {
             break;
+        }
+
+        if (!input.empty()) {
+            linenoiseHistoryAdd(input.c_str());
         }
 
         handleInput(input);

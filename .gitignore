@@ -3,3 +3,4 @@ build/
 databases/
 .DS_Store
 docs/*
+compile_commands.json

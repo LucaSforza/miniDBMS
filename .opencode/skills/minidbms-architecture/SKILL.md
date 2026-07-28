@@ -44,8 +44,8 @@ Pass the exact plan path and one or more explicit subtask IDs in every delegatio
 
 - Inspect the implementer's complete diff; never rely only on its summary.
 - Check the diff against the plan, educational clarity, C++17 constraints, serialization layout, file semantics, and error handling.
-- Use a focused build first: `cmake --build build --target StorageEngine` or `cmake --build build --target SQLInterpreter` as applicable.
-- Use `cmake -S . -B build` then `cmake --build build` for final integration. Initialize `libs/sql-parser` first if it is empty.
+- Use a focused build first: `make build/libStorageEngine.a` or `make build/libSQLInterpreter.a` as applicable.
+- Use `git submodule update --init --recursive` to fetch both pinned submodules, then `make` for final integration.
 - There is no project test suite. Do not report parser-submodule tests as project tests.
 - Send review fixes back to an implementer with the plan path and a new or reopened subtask ID.
 - At cycle end, directly update `AGENTS.md` with verified, reusable facts. Remove stale guidance when necessary; do not turn it into a task log.

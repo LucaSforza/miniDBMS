@@ -2,21 +2,22 @@
 
 ## Setup and Build
 
-- Initialize the pinned Hyrise parser before configuring: `git submodule update --init --recursive`. `libs/sql-parser/` is otherwise empty.
-- The build requires CMake 3.10+, a C++17 compiler, `make`, and Curses development headers/libraries.
-- Configure and build with `cmake -S . -B build` then `cmake --build build`. CMake invokes `make` inside `libs/sql-parser/`, links its `libsqlparser.so`, and copies that library beside `build/MiniDBMS`.
+- Initialize both pinned dependencies with `git submodule update --init --recursive`; this populates `libs/sql-parser/` and `libs/linenoise/`.
+- The build requires GNU Make, GCC-compatible C and C++ compilers, and C++17 support. CMake and Curses are not required.
+- Build incrementally with `make`. The top-level Makefile builds the parser through its own Makefile, compiles bundled linenoise as C, and produces `build/MiniDBMS` with an adjacent `build/libsqlparser.so` found through an `$ORIGIN` runtime path.
 - The parser build deliberately forces `<cstdint>` through `LIB_CFLAGS`; the pinned parser's generated Bison code otherwise fails on modern GCC because global `uintmax_t` is undeclared. Preserve this compatibility flag unless the submodule is upgraded.
-- For focused compile checks, use `cmake --build build --target StorageEngine` or `cmake --build build --target SQLInterpreter`.
+- For focused compile checks, use `make build/libStorageEngine.a` or `make build/libSQLInterpreter.a`.
+- Run `make compdb` with Bear installed to force a clean captured build and generate ignored root `compile_commands.json` for clangd/Neovim LSP use.
 - Generate API documentation with `doxygen Doxyfile`; output goes under ignored `docs/`.
 
 ## Current Baseline
 
 - There are no project tests, lint/format/typecheck tasks, CI workflows, or pre-commit hooks. Do not mistake the parser submodule's tests for this project's test suite.
-- A clean full build succeeds on modern GCC but emits expected deprecation warnings because the file API still uses C++17's deprecated `std::iterator`.
+- `make clean && make` succeeds on modern GCC but emits expected deprecation warnings because the file API still uses C++17's deprecated `std::iterator`.
 
 ## Architecture and Data Rules
 
-- Runtime flow is `src/main.cpp` -> `SQLInterface` (stdin REPL; `exit`/`quit`) -> `SQLInterpreter` -> the Hyrise SQL parser. The interpreter currently dispatches only `SELECT`, and its execution path is mostly a stub; the default REPL constructs it without a `Database`.
+- Runtime flow is `src/main.cpp` -> `SQLInterface` (linenoise one-line REPL) -> `SQLInterpreter` -> the Hyrise SQL parser. Non-empty commands enter in-memory history, a null linenoise result ends the loop as EOF, and exact `exit`/`quit` inputs terminate without dispatch. The interpreter currently dispatches only `SELECT`, and its execution path is mostly a stub; the default REPL constructs it without a `Database`.
 - Storage is split across domains (`Domains.*`), records/schema/database (`StorageEngine.*`), binary files (`Files.cpp`, `File.hpp`, `HeapFile.hpp`), and table abstractions (`Tables.*`).
 - `StorageEngine.hpp` and `Tables.hpp` are cyclically coupled. `src/Tables.cpp` must include `StorageEngine.hpp` first; including `Tables.hpp` directly leaves `PhysicalTable` unavailable when `Database` is declared.
 - Records are fixed-width raw byte strings. A `Relation` lays out all key fields first, followed by non-key fields; `HeapFile` key lookup assumes that prefix layout. Preserve exact domain sizes and field order when changing serialization.

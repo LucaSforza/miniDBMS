@@ -32,12 +32,12 @@ Use this skill only after the architect supplies a readable plan under `docs/` a
 
 ## Build and verification
 
-- If `libs/sql-parser/` is empty, report that `git submodule update --init --recursive` is required before configuring.
-- Configure with `cmake -S . -B build`.
+- If a pinned submodule directory (`libs/sql-parser/` or `libs/linenoise/`) is empty, report that `git submodule update --init --recursive` is required before building.
+- Use `make` for incremental builds; the default target produces `build/MiniDBMS`.
 - Prefer the relevant focused build while iterating:
-  - `cmake --build build --target StorageEngine`
-  - `cmake --build build --target SQLInterpreter`
-- Finish assigned integration work with `cmake --build build` when requested.
+  - `make build/libStorageEngine.a`
+  - `make build/libSQLInterpreter.a`
+- Finish assigned integration work with `make` when requested.
 - The repository has no project tests, lint task, formatter task, typecheck, or CI. Do not claim otherwise and do not substitute parser-submodule tests.
 - Expected `std::iterator` deprecation warnings are not new failures.
 
