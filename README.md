@@ -97,41 +97,6 @@ make compdb
 This runs a clean rebuild under Bear and writes the compilation database to
 the repository root (`compile_commands.json` is git-ignored).
 
----
-
-## Source layout
-
-```
-src/
-  main.cpp             — entry point, constructs SQLInterface
-  SQLInterface.cpp     — linenoise REPL loop
-  SQLInterpreter.cpp   — dispatches parsed SQL (currently only SELECT)
-  Domains.cpp          — domain type definitions
-  StorageEngine.cpp    — records, schema, Database
-  Files.cpp            — binary file I/O
-  Tables.cpp           — table abstractions (include StorageEngine.hpp first)
-include/
-  SQLInterface.hpp
-  SQLInterpreter.hpp
-  Domains.hpp
-  StorageEngine.hpp
-  File.hpp
-  HeapFile.hpp
-  Tables.hpp
-libs/
-  sql-parser/          — pinned Hyrise SQL parser submodule
-  linenoise/           — pinned linenoise submodule
-```
-
-### Runtime flow
-
-```
-main.cpp → SQLInterface (linenoise REPL)
-             → SQLInterpreter
-                 → Hyrise SQL parser
-                     → storage lookups / execution stubs
-```
-
 ### Storage model
 
 - Records are fixed-width raw byte strings.
