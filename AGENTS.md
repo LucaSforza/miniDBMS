@@ -9,6 +9,7 @@
 - For focused compile checks, use `make build/libStorageEngine.a` or `make build/libSQLInterpreter.a`.
 - Run `make compdb` with Bear installed to force a clean captured build and generate ignored root `compile_commands.json` for clangd/Neovim LSP use.
 - Generate API documentation with `doxygen Doxyfile`; output goes under ignored `docs/`.
+- Keep the user-facing `README.md` setup, build, REPL, and limitation statements synchronized with the verified Makefile and runtime behavior.
 
 ## Current Baseline
 
