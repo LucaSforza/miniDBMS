@@ -50,7 +50,7 @@ class Relation {
     size_t recordTotalSize;
     size_t keySize;
 public:
-    Relation(vector<Field> fields);
+    Relation(vector<Field> fieldList);
 
     /*
         Restituisce il numero di byte laddove inizia in un Record di questa relazione
@@ -89,7 +89,7 @@ public:
 
     Record(shared_ptr<Relation> rel, string data);
 
-    const string& getData();
+    const string& getData() const;
 
     // Ritorna una vista sulla parte di record di cui fa parte il campo
     const string_view valueAt(const Field& field) const;

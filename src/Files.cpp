@@ -1,14 +1,16 @@
 #include <stdexcept>
 #include <fcntl.h>
 #include <unistd.h>
-#include <stdexcept>
-#include <iostream>
 
 #include "HeapFile.hpp"
 #include "File.hpp"
 
 
 using namespace std;
+
+// -----------------------------------------------------------------------
+// File (base)
+// -----------------------------------------------------------------------
 
 File::File(string fileName): name(fileName) {
     file.open(fileName, ios::binary | ios::in | ios::out);
@@ -24,156 +26,209 @@ const string& File::filename() const { return name; }
 
 void File::flush() { file.flush(); }
 
-void File::sync() { file.sync(); }
-
+// -----------------------------------------------------------------------
+// HeapFile
+// -----------------------------------------------------------------------
 
 HeapFile::HeapFile(string fileName, size_t keySize, size_t recordSize)
 : File(fileName), keySize(keySize), recordSize(recordSize) {
+    // Validate basic size contracts
+    if (recordSize == 0)
+        throw runtime_error("HeapFile: recordSize must be non-zero");
+    if (keySize == 0)
+        throw runtime_error("HeapFile: keySize must be non-zero");
+    if (keySize > recordSize)
+        throw runtime_error("HeapFile: keySize must not exceed recordSize");
+
+    // Validate that an existing file is well-formed (multiple of recordSize)
+    file.clear();
     file.seekg(0, ios::end);
-    endFilePosition = file.tellg();
+    streampos length = file.tellg();
+    if (length > 0 && (length % recordSize) != 0)
+        throw runtime_error("HeapFile: existing file size is not a multiple of recordSize");
+
+    endFilePosition = static_cast<long>(length);
 }
 
 HeapFile::~HeapFile() {
-    file.close();
-    truncateFile();
+    // Destructor performs no throwing persistence work.
+    // Physical truncation happens eagerly in deleteData.
+    if (file.is_open())
+        file.close();
 }
 
-class RecordIterator : public iterator<input_iterator_tag, string> {
-    fstream& fileStream;
-    size_t recordSize;
-    size_t pos;
-public:
-    RecordIterator(fstream& file, size_t recordSize, size_t pos = 0)
-        : fileStream(file), recordSize(recordSize), pos(pos) {}
+// -----------------------------------------------------------------------
+// scan — return all records as a vector
+// -----------------------------------------------------------------------
 
-    iterator& operator++() {
-        pos += recordSize;
-        return *this;
-    }
+vector<string> HeapFile::scan() {
+    vector<string> records;
+    file.clear();
+    file.seekg(0, ios::beg);
 
-    string operator*() const {
-        string record(recordSize, '\0');
-        fileStream.seekg(pos, ios::beg);
-        fileStream.read(record.data(), recordSize);
-        return record;
-    }
+    string record(recordSize, '\0');
+    while (file.read(record.data(), recordSize))
+        records.push_back(record);
 
-    bool operator==(const RecordIterator& other) const {
-        return pos == other.pos;
-    }
-
-    bool operator!=(const RecordIterator& other) const {
-        return pos != other.pos;
-    }
-};
-
-iterator<input_iterator_tag,string> HeapFile::begin() {
-    return RecordIterator(file, recordSize);
+    file.clear();               // clear EOF/fail bits for subsequent operations
+    return records;
 }
 
-iterator<input_iterator_tag,string> HeapFile::end() {
-    return RecordIterator(file, recordSize, endFilePosition);
+// -----------------------------------------------------------------------
+// insert — append a single fixed-width record
+// -----------------------------------------------------------------------
+
+void HeapFile::insert(string_view record) {
+    if (record.size() != recordSize)
+        throw runtime_error("HeapFile::insert: record size does not match expected recordSize");
+
+    file.clear();
+    file.seekp(0, ios::end);
+    if (!file.write(record.data(), recordSize))
+        throw runtime_error("HeapFile::insert: failed to write record");
+
+    endFilePosition += recordSize;
 }
 
-void HeapFile::pushData(string_view data) {
-    if(data.length() % recordSize != 0 || data.length() == 0)
-        throw runtime_error("Data length is not a multiple of record size");
-
-    file.seekg(endFilePosition, ios::beg);
-    if(!file.write(data.data(), data.length()))
-        throw runtime_error("Failed to write data");
-    endFilePosition += data.length();
-}
-
-optional<string> HeapFile::deleteData(string_view key) {
-    
-    auto last_record = getLastRecord();
-    
-    if(last_record.has_value()) {
-
-        long pos = searchPosition(key);
-        if(pos == -1) return nullptr;
-
-        file.seekp(pos, ios::beg);
-        file.write(last_record.value().c_str(), recordSize);
-        removeLastRecord();
-        return last_record.value();
-    }
-
-    return nullptr;
-}
+// -----------------------------------------------------------------------
+// getData — search for a record by key prefix; return nullopt if missing
+// -----------------------------------------------------------------------
 
 optional<string> HeapFile::getData(string_view key) {
-    string result(recordSize, '\0');
+    if (key.size() != keySize)
+        throw runtime_error("HeapFile::getData: key size mismatch");
 
+    file.clear();
     file.seekg(0, ios::beg);
-    size_t n = 0;
 
-    do {
-        n = file.read(result.data(), recordSize).gcount();
-        if(n < recordSize) {
+    string record(recordSize, '\0');
+    while (file.read(record.data(), recordSize)) {
+        if (string_view(record.data(), keySize) == key) {
             file.clear();
-            return nullopt;
+            return record;
         }
-        if(string_view(result.c_str(),keySize) == key)
-            return result;
-    }while(true);
+    }
 
-    throw std::logic_error("FATAL ERROR: Unreachable code");
+    file.clear();
+    return nullopt;
 }
 
+// -----------------------------------------------------------------------
+// updateData — overwrite the full record identified by key
+// -----------------------------------------------------------------------
+
+void HeapFile::updateData(string_view key, string_view newRecord) {
+    if (key.size() != keySize)
+        throw runtime_error("HeapFile::updateData: key size mismatch");
+    if (newRecord.size() != recordSize)
+        throw runtime_error("HeapFile::updateData: new record size mismatch");
+
+    long pos = searchPosition(key);
+    if (pos == -1)
+        throw runtime_error("HeapFile::updateData: key not found");
+
+    file.clear();
+    file.seekp(pos, ios::beg);
+    if (!file.write(newRecord.data(), recordSize))
+        throw runtime_error("HeapFile::updateData: failed to write record");
+}
+
+// -----------------------------------------------------------------------
+// deleteData — remove the record identified by key, return the deleted record
+//
+// The implementation uses swap-with-last: the last record fills the vacated
+// slot, then the file is truncated immediately.
+// -----------------------------------------------------------------------
+
+optional<string> HeapFile::deleteData(string_view key) {
+    if (key.size() != keySize)
+        throw runtime_error("HeapFile::deleteData: key size mismatch");
+
+    long pos = searchPosition(key);
+    if (pos == -1)
+        return nullopt;
+
+    // Read the record at the key position (the one to delete)
+    file.clear();
+    file.seekg(pos, ios::beg);
+    string deletedRecord(recordSize, '\0');
+    if (!file.read(deletedRecord.data(), recordSize))
+        throw runtime_error("HeapFile::deleteData: failed to read record for deletion");
+
+    // If the deleted record is not the last one, swap the last record into its place
+    bool isLast = (pos == static_cast<long>(endFilePosition - recordSize));
+    if (!isLast) {
+        auto last = getLastRecord();
+        if (!last)
+            throw runtime_error("HeapFile::deleteData: inconsistent state (no last record)");
+
+        file.clear();
+        file.seekp(pos, ios::beg);
+        if (!file.write(last->data(), recordSize))
+            throw runtime_error("HeapFile::deleteData: failed to write swap record");
+    }
+
+    // Remove the last slot and truncate the physical file immediately
+    removeLastRecord();
+    return deletedRecord;
+}
+
+// -----------------------------------------------------------------------
+// Private helpers
+// -----------------------------------------------------------------------
+
 long HeapFile::searchPosition(string_view key) {
-    //TODO: gestire il caso in cui la lunghezza della key è sbagliata
+    if (key.size() != keySize)
+        throw runtime_error("HeapFile::searchPosition: key size mismatch");
 
-    if(!file)
-        throw runtime_error("Not working");
-
+    file.clear();
     file.seekg(0, ios::beg);
+
     string data(recordSize, '\0');
-    size_t n = 0;
+    long pos = 0;
 
-    long result = 0;
-
-    do {
-        result += n;
-        n = file.read(data.data(), recordSize).gcount();
-        if(n < recordSize) {
+    while (file.read(data.data(), recordSize)) {
+        if (string_view(data.data(), keySize) == key) {
             file.clear();
-            return -1;
+            return pos;
         }
-        if(string_view(data.c_str(),keySize) == key)
-            return result;
-    }while(true);
+        pos += recordSize;
+    }
 
-        
+    file.clear();
+    return -1;
 }
 
 optional<string> HeapFile::getLastRecord() {
-    // TODO: gestire il caso in cui non ci sia un record alla fine poiché il file è vuoto
-    size_t position = endFilePosition - recordSize;
+    if (endFilePosition == 0)
+        return nullopt;
 
-        // Move the file pointer to the position of the last record
-    file.seekg(position, ios::beg);
+    file.clear();
+    file.seekg(endFilePosition - recordSize, ios::beg);
 
-        // Read the last record from the file
-    string lastRecord(recordSize, '\0');
-    file.read(lastRecord.data(), recordSize);
+    string record(recordSize, '\0');
+    if (!file.read(record.data(), recordSize))
+        return nullopt;
 
-
-    return lastRecord;
+    return record;
 }
 
 void HeapFile::removeLastRecord() {
+    if (endFilePosition == 0)
+        throw runtime_error("HeapFile::removeLastRecord: heap is empty");
+
     endFilePosition -= recordSize;
+    truncateFile();
 }
 
 void HeapFile::truncateFile() {
-    //TODO: modificare questo metodo in modo che sia supportato anche su Windows
+    // Flush the fstream buffer so the OS-level truncation sees the latest data.
+    // ftruncate is POSIX; this DBMS targets Linux (and other POSIX systems).
+    file.flush();
 
-    int fd = open(filename().c_str(), O_RDWR); // Ottieni il file descriptor
-    if (fd == -1) {
-        throw runtime_error("Failed to open file descriptor: " + filename());
-    }
+    int fd = open(filename().c_str(), O_RDWR);
+    if (fd == -1)
+        throw runtime_error("Failed to open file descriptor for truncation: " + filename());
 
     if (ftruncate(fd, endFilePosition) != 0) {
         close(fd);

@@ -26,7 +26,7 @@ Use this skill only after the architect supplies a readable plan under `docs/` a
 - Avoid new dependencies and large abstraction layers unless the plan explicitly calls for them.
 - Maintain the fixed-width raw-record representation.
 - Preserve the `Relation` layout of all key fields followed by all non-key fields.
-- Remember that `HeapFile` deletion replaces a removed record with the final record; never assume stable record order.
+- Remember that `HeapFile` deletion replaces a removed record with the final record and immediately truncates the physical file; never assume stable record order.
 - In `src/Tables.cpp`, include `StorageEngine.hpp` before `Tables.hpp` because of the current header cycle.
 - Preserve the parser's forced `<cstdint>` compatibility flag unless the plan upgrades the parser.
 
@@ -37,9 +37,10 @@ Use this skill only after the architect supplies a readable plan under `docs/` a
 - Prefer the relevant focused build while iterating:
   - `make build/libStorageEngine.a`
   - `make build/libSQLInterpreter.a`
+- Use `make test` for required green core-regression validation (must exit zero).
+- `make test-future` compiles and runs future SQL specification assertions; its non-zero exit is expected and signals incomplete user implementation, not a regression.
+- Do not substitute the parser submodule's test suite for project-owned suites.
 - Finish assigned integration work with `make` when requested.
-- The repository has no project tests, lint task, formatter task, typecheck, or CI. Do not claim otherwise and do not substitute parser-submodule tests.
-- Expected `std::iterator` deprecation warnings are not new failures.
 
 ## Commit discipline
 

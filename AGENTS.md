@@ -8,21 +8,23 @@
 - The parser build deliberately forces `<cstdint>` through `LIB_CFLAGS`; the pinned parser's generated Bison code otherwise fails on modern GCC because global `uintmax_t` is undeclared. Preserve this compatibility flag unless the submodule is upgraded.
 - For focused compile checks, use `make build/libStorageEngine.a` or `make build/libSQLInterpreter.a`.
 - Run `make compdb` with Bear installed to force a clean captured build and generate ignored root `compile_commands.json` for clangd/Neovim LSP use.
+- Run `make test` for the required green core regression suite. `make test-future` builds and runs the intentionally red SQL workflow benchmark; its non-zero result is expected until the user completes CREATE/INSERT/SELECT/UPDATE/DELETE execution.
 - Generate API documentation with `doxygen Doxyfile`; output goes under ignored `docs/`.
 - Keep the user-facing `README.md` setup, build, REPL, and limitation statements synchronized with the verified Makefile and runtime behavior.
 
 ## Current Baseline
 
-- There are no project tests, lint/format/typecheck tasks, CI workflows, or pre-commit hooks. Do not mistake the parser submodule's tests for this project's test suite.
-- `make clean && make` succeeds on modern GCC but emits expected deprecation warnings because the file API still uses C++17's deprecated `std::iterator`.
+- The project has a dependency-free C++17 harness under `tests/`; green fixtures use `build/test-data/` and are removed by `make clean`. There are still no lint/format/typecheck tasks, CI workflows, or pre-commit hooks. Do not substitute parser-submodule tests for `make test`.
+- `make clean && make` succeeds on modern GCC without project compiler warnings at the current baseline.
 
 ## Architecture and Data Rules
 
 - Runtime flow is `src/main.cpp` -> `SQLInterface` (linenoise one-line REPL) -> `SQLInterpreter` -> the Hyrise SQL parser. Non-empty commands enter in-memory history, a null linenoise result ends the loop as EOF, and exact `exit`/`quit` inputs terminate without dispatch. The interpreter currently dispatches only `SELECT`, and its execution path is mostly a stub; the default REPL constructs it without a `Database`.
 - Storage is split across domains (`Domains.*`), records/schema/database (`StorageEngine.*`), binary files (`Files.cpp`, `File.hpp`, `HeapFile.hpp`), and table abstractions (`Tables.*`).
 - `StorageEngine.hpp` and `Tables.hpp` are cyclically coupled. `src/Tables.cpp` must include `StorageEngine.hpp` first; including `Tables.hpp` directly leaves `PhysicalTable` unavailable when `Database` is declared.
-- Records are fixed-width raw byte strings. A `Relation` lays out all key fields first, followed by non-key fields; `HeapFile` key lookup assumes that prefix layout. Preserve exact domain sizes and field order when changing serialization.
-- `HeapFile` is an in-place binary heap file. Deletion replaces the removed record with the final record and truncates on destruction; it does not preserve record order.
+- Records are fixed-width raw byte strings. A `Relation` lays out all key fields first, followed by non-key fields; `HeapFile` key lookup assumes that prefix layout. Record construction requires the exact relation byte size, and updates validate a complete candidate before mutating stored data. Preserve exact domain sizes and field order when changing serialization.
+- `File` exposes value-based `scan`, insert, lookup, update, and delete operations; table lookups/scans also return records by value rather than cache-backed references.
+- `HeapFile` is an in-place binary heap file. Deletion returns the requested record, replaces its slot with the final record when necessary, and immediately truncates the physical file; it does not preserve record order.
 - Runtime database data belongs under ignored `databases/`; build output is under ignored `build/`.
 
 ## Educational Goal

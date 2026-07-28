@@ -5,124 +5,124 @@
 
 /**
  * @class Table
- * @brief Represents a table in a miniDBMS.
- * 
- * The Table class provides functionality to manipulate and interact with a table in the miniDBMS.
- * It contains methods to add records, search for records, delete records, and update records.
- * 
- * @note This class is meant to be inherited from and should not be instantiated directly.
+ * @brief Abstract base for tables in a miniDBMS.
+ *
+ * Records are laid out with key fields first, followed by non-key fields
+ * (as defined by Relation).  All operations return records by value so
+ * that callers never hold references invalidated by container growth or
+ * transient caches.
+ *
+ * Update operations guarantee a *validate-before-mutate* discipline:
+ * every new value is checked (field membership, size, domain constraint)
+ * before any data is written.  If the key is changed the operation also
+ * rejects the new key when it would duplicate an existing record.  On
+ * failure the original record is left unchanged.
  */
 class Table {
 protected:
     shared_ptr<Relation> rel;
 public:
+    explicit Table(shared_ptr<Relation> rel);
+    virtual ~Table() = default;
 
-    Table(shared_ptr<Relation> rel);
+    /// Insert a validated Record.  Throws if a duplicate key already exists.
+    virtual void addRecord(Record record) = 0;
 
-    /**
-     * @brief Adds a record to the table.
-     *
-     * @param record The record to be added.
-     */
-    virtual void addRecord(Record record);
-
-    /**
-     * @brief Adds a record to the table.
-     *
-     * @param data The raw data to be added.
-     */
+    /// Convenience: construct a Record from raw bytes and insert it.
     virtual void addRecord(string data);
 
-    //TODO: virtual VirtualTable search(QueryPlan plan) const;
-
-    //TODO: virtual JoinedTable join(Table& rightTable);
+    /**
+     * @brief Look up a record by its key prefix.
+     * @return The Record if found, or nullopt if no record has that key.
+     * @throws invalid_argument if key size does not match the relation's key size.
+     */
+    virtual optional<Record> getRecord(string_view key) = 0;
 
     /**
-     * @brief get a Reference to a Record
-     * 
-     * @note this function is not constant to allow flexibility to the various implementations of the Table class
-     * 
-     * @param key raw data that rappresent a key
-     * @return nullptr if the record don't exist or a constant reference to the Record
-     * @throw invalid_argument if the key is not valid
+     * @brief Delete the record identified by key.
+     * @return The deleted Record, or nullopt if the key was not found.
+     * @throws invalid_argument if key size does not match the relation's key size.
      */
-    virtual optional<ConstRecordRef> getRecord(string_view key);
+    virtual optional<Record> deleteRecord(string_view key) = 0;
 
     /**
-     * @brief delete a Record
-     * 
-     * @param key vector of values of a key
-     * @return nullptr if the record don't exist or the Record
-     * @throw invalid_argument if the key is not valid
+     * @brief Update fields of the record identified by @p key.
+     *
+     * Semantics:
+     *   1. Validate key length upfront.
+     *   2. Locate the old record.  Return false if not found.
+     *   3. Copy the old record into a candidate and apply every new Value
+     *      via Record::setValue (which validates field membership, size, and
+     *      domain constraints; throws on failure).
+     *   4. If the key was changed, reject the update when the new key already
+     *      belongs to a different record (return false).
+     *   5. Commit: assign the candidate back (virtual) or call File::updateData
+     *      (physical).
+     *
+     * On any failure before commit the original record remains untouched.
+     *
+     * @return true on success, false if the key was not found or the new key
+     *         duplicates an existing record.
+     * @throws invalid_argument if key size is wrong.
+     * @throws invalid_argument if a Value fails validation (via setValue).
      */
-    virtual optional<Record> deleteRecord(string_view key);
+    virtual bool updateRecordByKey(string_view key, const vector<Value>& newValues) = 0;
 
     /**
-     * @brief update the values of a Record.
-     * 
-     * @param key the key of the record you want to edit.
-     * @param newValues vector of values to be replaced.
-     * 
-     * @return false if the key of the newRecord don't exist, true otherwise.
+     * @brief Return every record by value.
+     *
+     * This is deliberately simple — a full heap scan — and serves as the
+     * educational boundary for the future executor.
      */
-    virtual bool updateRecordByKey(string_view key, const vector<Value>& newValues);
+    virtual vector<Record> scan() = 0;
 
-    /**
-     * @brief getter for rel
-     */
     shared_ptr<Relation> getRelation();
-
 };
 
 
 /**
  * @class VirtualTable
- * @brief Represents a virtual table in a miniDBMS.
- * 
- * The VirtualTable class provides functionality to manipulate and interact with a table,but the records are stored only
- * in volatile memory.
- * It contains methods to add records, search for records, delete records, and update records.
- * 
+ * @brief An in-memory table backed by a vector of Records.
+ *
+ * All data lives in volatile memory and is lost when the object is destroyed.
+ * Key uniqueness is enforced at insert and update time.
  */
-class VirtualTable: public Table {
-
+class VirtualTable : public Table {
     vector<Record> records;
-
 public:
+    explicit VirtualTable(shared_ptr<Relation> rel);
 
+    using Table::addRecord;
     void addRecord(Record record) override;
-
-    void addRecord(string data) override;
-
-    optional<ConstRecordRef> getRecord(string_view key) override;
-
+    optional<Record> getRecord(string_view key) override;
     optional<Record> deleteRecord(string_view key) override;
-
     bool updateRecordByKey(string_view key, const vector<Value>& newValues) override;
-
+    vector<Record> scan() override;
 };
 
-class PhysicalTable: public Table {
+
+/**
+ * @class PhysicalTable
+ * @brief A persistent table backed by a File (HeapFile).
+ *
+ * Records are stored in a fixed-width binary heap file.  Operations
+ * delegate to the File interface for persistence so that every mutation
+ * is immediately visible.
+ */
+class PhysicalTable : public Table {
     string name;
-    // records salvati nella RAM e non sul disco rigito
-    vector<Record> volatileRecords;
     FilePtr file;
 public:
     PhysicalTable(shared_ptr<Relation> rel, string name, FilePtr file);
 
+    using Table::addRecord;
     void addRecord(Record record) override;
-
-    void addRecord(string data) override;
-
-    optional<ConstRecordRef> getRecord(string_view key) override;
-
+    optional<Record> getRecord(string_view key) override;
     optional<Record> deleteRecord(string_view key) override;
-
     bool updateRecordByKey(string_view key, const vector<Value>& newValues) override;
+    vector<Record> scan() override;
 
     const string& getName() const;
-
-    void clear();
 };
 
 using PhysicalTableRef = reference_wrapper<PhysicalTable>;

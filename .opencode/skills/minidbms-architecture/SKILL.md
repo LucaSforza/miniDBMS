@@ -22,7 +22,7 @@ miniDBMS exists to help its author learn DBMS theory. Prefer direct, inspectable
 - The interpreter currently dispatches only `SELECT`, most execution is a stub, and the default REPL constructs it without a `Database`.
 - `StorageEngine.hpp` and `Tables.hpp` are cyclically coupled. `src/Tables.cpp` must include `StorageEngine.hpp` before `Tables.hpp`.
 - Records are fixed-width raw byte strings. A `Relation` serializes every key field first and then every non-key field. `HeapFile` lookup depends on that key-prefix layout.
-- `HeapFile` deletion swaps in the final record and truncates on destruction; record order is not stable.
+- `HeapFile` deletion swaps the final record into the removed slot, immediately truncates the physical file, and does not preserve record order.
 - Preserve exact domain sizes, field order, on-disk compatibility, and ownership/lifetime assumptions unless the plan explicitly designs a migration.
 
 ## Mandatory plan
@@ -46,6 +46,7 @@ Pass the exact plan path and one or more explicit subtask IDs in every delegatio
 - Check the diff against the plan, educational clarity, C++17 constraints, serialization layout, file semantics, and error handling.
 - Use a focused build first: `make build/libStorageEngine.a` or `make build/libSQLInterpreter.a` as applicable.
 - Use `git submodule update --init --recursive` to fetch both pinned submodules, then `make` for final integration.
-- There is no project test suite. Do not report parser-submodule tests as project tests.
+- Require `make test` to pass (green core-regression suite; must exit zero).
+- `make test-future` is expected to exit non-zero until the user implements the SQL workflows; its red output is a benchmark, not a current failure. Do not report parser-submodule tests as project tests.
 - Send review fixes back to an implementer with the plan path and a new or reopened subtask ID.
 - At cycle end, directly update `AGENTS.md` with verified, reusable facts. Remove stale guidance when necessary; do not turn it into a task log.

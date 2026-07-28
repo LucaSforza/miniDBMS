@@ -18,11 +18,11 @@ public:
 
     ~HeapFile() override;
 
-    iterator<input_iterator_tag,string> begin() override;
-    iterator<input_iterator_tag,string> end() override;
-    void pushData(string_view data) override;
-    optional<string> deleteData(string_view key) override;
+    vector<string> scan() override;
+    void insert(string_view record) override;
     optional<string> getData(string_view key) override;
+    void updateData(string_view key, string_view newRecord) override;
+    optional<string> deleteData(string_view key) override;
 
 private:
 

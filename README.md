@@ -7,8 +7,9 @@ without the complexity of a production system.
 
 **Current status** — early development. The REPL dispatches only `SELECT`
 statements, and its execution path is mostly a stub. There is no SQL data
-manipulation language, no test suite, and no stability guarantee. The project
-exists to make internal DBMS concepts visible.
+manipulation language implementation (see "Future SQL specifications"
+under Tests). The project exists to make internal DBMS concepts visible.
+The stabilized storage core is protected by a passing regression suite.
 
 ---
 
@@ -68,6 +69,32 @@ make clean
 
 ---
 
+### Tests
+
+```sh
+make test
+```
+
+Builds and runs the **green suite** — passing core-regression tests
+that protect domain, record, file, heap-file, and table behavior.
+Must exit zero.
+
+```sh
+make test-future
+```
+
+Builds and runs **future SQL specifications** — executable descriptions
+of intended `CREATE TABLE`, `INSERT`, `SELECT`, `UPDATE`, and `DELETE`
+workflow. This target is expected to exit **non-zero** until the
+corresponding SQL execution is implemented. A passing build with red
+assertions means the specification is intact; green assertions signal
+working user implementation.
+
+Do **not** mistake the parser submodule's test suite
+(`libs/sql-parser/`) for these project-owned suites.
+
+---
+
 ## Run
 
 ```sh
@@ -101,8 +128,12 @@ the repository root (`compile_commands.json` is git-ignored).
 
 - Records are fixed-width raw byte strings.
 - A `Relation` lays out all key fields first, followed by non-key fields.
+- File scans and table lookups/scans return records by value.
+- Record updates validate the complete candidate before mutating; on failure
+  the original record is preserved unchanged.
 - `HeapFile` is an in-place binary heap file; deletion replaces the removed
-  record with the final record and does not preserve record order.
+  record with the final record, immediately resizes the physical file, and
+  does not preserve record order.
 - Runtime database data lives under the ignored `databases/` directory.
 
 ---
@@ -113,12 +144,11 @@ the repository root (`compile_commands.json` is git-ignored).
   `CREATE`, and all DDL are not handled.
 - Query execution is mostly a stub — the default REPL builds the interpreter
   without a `Database`, so most queries produce an error or do nothing.
-- There are **no project-level tests**, linting, formatting, or type-checking
-  tasks. The parser submodule has its own test suite; do not mistake it for
-  a project test suite.
+- The parser submodule (`libs/sql-parser/`) has its own test suite;
+  do not mistake it for the project-owned suites described under Tests.
+- There are no linting, formatting, or type-checking tasks.
 - `StorageEngine.hpp` and `Tables.hpp` are cyclically coupled —
   `src/Tables.cpp` must include `StorageEngine.hpp` before `Tables.hpp`.
-- The build emits deprecation warnings from the use of C++17's deprecated
-  `std::iterator` in the file API — these are expected.
+- The build currently produces no project warnings.
 - No SQL standard compliance, concurrency, durability guarantees, or
   production deployment support is implied.

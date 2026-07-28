@@ -5,6 +5,7 @@
 #include <fstream>
 #include <memory>
 #include <optional>
+#include <vector>
 
 using namespace std;
 
@@ -13,8 +14,7 @@ using namespace std;
  * @brief Represents a file in the miniDBMS system.
  * 
  * The File class provides functionality to interact with a file at a low level in the miniDBMS system.
- * It allows flushing and syncing of the file, as well as iterating over the records in the file.
- * It also provides methods to insert, delete, and retrieve data from the file.
+ * It provides methods to scan, insert, lookup, update, and delete fixed-width records.
  * 
  */
 class File {
@@ -33,37 +33,51 @@ public:
      * @brief flush the main stream of the file
      */
     void flush();
-    /**
-     * @brief sync the main stream of the file
-     */
-    void sync();
+
 
     /**
-     * @brief Returns an iterator of records without ordering.
+     * @brief Scan all records in the file.
      *
-     * @return An iterator of records.
+     * @return A vector of all records as raw strings.
      */
-    virtual iterator<input_iterator_tag,string> begin() = 0;
+    virtual vector<string> scan() = 0;
 
     /**
-     * @return Mark the end of a iterator in the file.
+     * @brief Insert a single fixed-width record.
+     *
+     * @param record The record data; must be exactly recordSize bytes.
      */
-    virtual iterator<input_iterator_tag,string> end() = 0;
+    virtual void insert(string_view record) = 0;
 
     /**
-     * @brief push data on the file
-     */
-    virtual void pushData(string_view data) = 0;
-    /**
-     * @brief delete data from the file
-     */
-    virtual optional<string> deleteData(string_view key) = 0;
-    /**
-     * @brief search data starting with a key
-     * 
-     * @return nullptr if the record don't exists, a string otherwise
+     * @brief Look up a record by key prefix.
+     *
+     * @param key The key to search for; must be exactly keySize bytes.
+     * @return The record if found, nullopt otherwise.
      */
     virtual optional<string> getData(string_view key) = 0;
+
+    /**
+     * @brief Overwrite the record identified by key with newRecord.
+     *
+     * The caller must ensure that newRecord has the correct size and that
+     * a record with the given key exists.
+     *
+     * @param key The key of the record to update; must be exactly keySize bytes.
+     * @param newRecord The replacement record data; must be exactly recordSize bytes.
+     */
+    virtual void updateData(string_view key, string_view newRecord) = 0;
+
+    /**
+     * @brief Delete the record identified by key.
+     *
+     * The deleted record is returned. The last record is swapped into the
+     * vacated slot and the physical file is truncated immediately.
+     *
+     * @param key The key of the record to delete; must be exactly keySize bytes.
+     * @return The deleted record, or nullopt if the key was not found.
+     */
+    virtual optional<string> deleteData(string_view key) = 0;
 
 };
 
