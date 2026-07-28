@@ -19,7 +19,7 @@ ExternalProject_Add(
     sqlparser
     SOURCE_DIR ${SQL_PARSER_DIR}
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND make
+    BUILD_COMMAND make "LIB_CFLAGS=-std=c++17 -O3 -fPIC -include cstdint"
     INSTALL_COMMAND ""
     BUILD_IN_SOURCE 1
 )
@@ -28,7 +28,7 @@ ExternalProject_Add(
 add_executable(MiniDBMS src/main.cpp)
 
 # Aggiungi i file sorgente al progetto
-add_library(StorageEngine src/StorageEngine.cpp src/Files.cpp src/Domains.cpp)
+add_library(StorageEngine src/StorageEngine.cpp src/Files.cpp src/Domains.cpp src/Tables.cpp)
 add_library(SQLInterpreter src/SQLInterface.cpp src/SQLInterpreter.cpp)
 
 find_package(Curses REQUIRED)

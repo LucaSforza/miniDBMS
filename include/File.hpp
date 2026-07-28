@@ -3,6 +3,7 @@
 
 #include <string>
 #include <fstream>
+#include <memory>
 #include <optional>
 
 using namespace std;

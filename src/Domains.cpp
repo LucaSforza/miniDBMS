@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "Domains.hpp"
 
 EnumDomain::EnumDomain(const std::vector<std::string>& validValues) : validValues(validValues) {

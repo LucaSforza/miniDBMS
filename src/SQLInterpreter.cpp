@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "SQLInterpreter.hpp"
+#include "SQLParser.h"
 #include "sql/SQLStatement.h"
 #include "sql/Table.h"
 

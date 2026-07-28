@@ -1,6 +1,7 @@
 #ifndef DOMAINS_HPP
 #define DOMAINS_HPP
 
+#include <memory>
 #include <string>
 #include <vector>
 

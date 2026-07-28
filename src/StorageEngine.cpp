@@ -1,3 +1,5 @@
+#include <cstring>
+
 #include "StorageEngine.hpp"
 #include "Tables.hpp"
 #include "File.hpp"
@@ -165,4 +167,3 @@ Database::Database(string name,string dirPath): name(name), dirPath(dirPath) {
         fs::create_directory(dirPath);
     }
 }
-
