@@ -22,3 +22,16 @@
 - Records are fixed-width raw byte strings. A `Relation` lays out all key fields first, followed by non-key fields; `HeapFile` key lookup assumes that prefix layout. Preserve exact domain sizes and field order when changing serialization.
 - `HeapFile` is an in-place binary heap file. Deletion replaces the removed record with the final record and truncates on destruction; it does not preserve record order.
 - Runtime database data belongs under ignored `databases/`; build output is under ignored `build/`.
+
+## Educational Goal
+
+- This is a deliberately small DBMS for learning database theory. Prefer clear, direct implementations that expose storage, schema, query, and execution concepts over production-grade frameworks or premature abstraction.
+- Keep code paths easy to follow from SQL input to storage behavior. Comments should explain DBMS semantics and invariants, not restate C++ syntax.
+
+## OpenCode Agent Team
+
+- Project-local OpenCode configuration lives in `opencode.json` and `.opencode/`. The default `architect` agent plans and reviews; only the `implementer` subagent changes production code.
+- Every architect-led task starts with a written plan under ignored `docs/plans/`. Delegations must identify the plan path, subtask, owned files, dependencies, validation, and commit policy.
+- Parallel implementation is preferred only for independent subtasks with disjoint file ownership or a settled shared interface.
+- The architect reviews every implementer result and the final integrated diff. Review corrections are delegated back to an implementer.
+- At the end of every completed agentic cycle, the architect directly updates this file with durable, verified commands, architecture facts, or invariants and removes stale guidance. Do not add transient task status or a session diary.
